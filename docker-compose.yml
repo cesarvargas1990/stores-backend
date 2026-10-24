@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: storesadmin
+      POSTGRES_USER: storesadmin
+      POSTGRES_PASSWORD: storesadmin_dev_change_me
+    ports:
+      - "5432:5432"
+    volumes:
+      - storesadmin_pgdata:/var/lib/postgresql/data
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      PORT: 3030
+      DATABASE_URL: postgres://storesadmin:storesadmin_dev_change_me@postgres:5432/storesadmin
+      COOKIE_SECURE: "true"
+      MASTER_EMAIL: ${MASTER_EMAIL}
+      MASTER_PASSWORD: ${MASTER_PASSWORD}
+      EBC_EMAIL: ${EBC_EMAIL}
+      EBC_PASSWORD: ${EBC_PASSWORD}
+      EBC_STORE_ORIGIN: ${EBC_STORE_ORIGIN}
+      EBC_API_KEY: ${EBC_API_KEY}
+    ports:
+      - "3030:3030"
+    volumes:
+      - storesadmin_uploads:/app/uploads
+volumes:
+  storesadmin_pgdata:
+  storesadmin_uploads:
