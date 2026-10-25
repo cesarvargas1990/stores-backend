@@ -9,6 +9,7 @@
     "test": "node --test",
     "check": "node --check src/server.js",
     "db:migrate": "node --env-file-if-exists=.env src/migrate.js",
+    "catalog:organize": "node --env-file-if-exists=.env src/migrate-catalog-categories.js",
     "admin:reset": "node --env-file-if-exists=.env src/reset-admin.js"
   },
   "dependencies": {
