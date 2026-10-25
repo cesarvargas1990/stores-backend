@@ -12,7 +12,7 @@ const targetCategories = {
   'f11dce49-52e2-4349-bc67-a004577c3982': ['Cuidado capilar', 'Productos para cabello y cuero cabelludo.'],
   '8817862d-8cbf-444d-ac29-7b4df14e05b4': ['Cuidado íntimo', 'Productos de higiene y cuidado íntimo.'],
   'f4aed0fa-25cd-4560-869a-fd92c7edb211': ['Electrónica', 'Tecnología y dispositivos.'],
-  '8d9ffbf0-45ea-4379-9d63-8263f698f7b7': ['Legado EOS', 'Categoría archivada; usar clasificación por tipo.'],
+  '8d9ffbf0-45ea-4373-9d63-8263f698f7b7': ['Legado EOS', 'Categoría archivada; usar clasificación por tipo.'],
   'ee882964-e20a-4624-9f7b-21737474b0a0': ['Legado Kiko Milano', 'Categoría archivada; usar clasificación por tipo.']
 };
 
@@ -20,11 +20,11 @@ function classify(name) {
   const value = String(name || '').toLocaleLowerCase('es-CO');
   if (value.includes('iphone')) return 'Electrónica';
   if (/(spirulina|vinagre|omega|collagen|fish oil|vitamina|hierro|acidez|zinc|biotina|d3|magnesio|centrum)/.test(value)) return 'Vitaminas y suplementos';
-  if (/(lip gloss|gloss|kiko)/.test(value)) return 'Maquillaje y belleza';
+  if (/(lip gloss|gloss|bálsamo labial|labial|kiko)/.test(value)) return 'Maquillaje y belleza';
   if (value.includes('jabón íntimo')) return 'Cuidado íntimo';
   if (/(body mist|body misty|perfume|bruma)/.test(value)) return 'Fragancias';
   if (/(capilar|cabello|pelo|hair|castor|rapunzel|cer 100)/.test(value)) return 'Cuidado capilar';
-  if (/(vaseline|crema corporal|aceite corporal|aceite para masajes|exfoliante corporal|jabón corporal|body cream|body oil|stop chafe|the ordinary|cuidado corporal|body bright|kit de cuidado corporal)/.test(value)) return 'Cuidado personal';
+  if (/(vaseline|crema corporal|aceite corporal|aceite para masajes|exfoliante corporal|jabón corporal|body cream|body oil|stop chafe|the ordinary|cuidado corporal|body bright|bright cream|kit de cuidado corporal)/.test(value)) return 'Cuidado personal';
   return 'Cuidado facial y corporal';
 }
 
