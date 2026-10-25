@@ -11,14 +11,14 @@ const targetCategories = {
   '1b3b6b60-cb98-4af7-8131-bfc13d69d155': ['Maquillaje y belleza', 'Maquillaje, labios y accesorios de belleza.'],
   'f11dce49-52e2-4349-bc67-a004577c3982': ['Cuidado capilar', 'Productos para cabello y cuero cabelludo.'],
   '8817862d-8cbf-444d-ac29-7b4df14e05b4': ['Cuidado íntimo', 'Productos de higiene y cuidado íntimo.'],
-  'f4aed0fa-25cd-4560-869a-fd92c7edb211': ['Electrónica', 'Tecnología y dispositivos.'],
+  'f4aed0fa-25cd-4560-869a-fd92c7edb211': ['Telefonía', 'Teléfonos y dispositivos móviles.'],
   '8d9ffbf0-45ea-4373-9d63-8263f698f7b7': ['Legado EOS', 'Categoría archivada; usar clasificación por tipo.'],
   'ee882964-e20a-4624-9f7b-21737474b0a0': ['Legado Kiko Milano', 'Categoría archivada; usar clasificación por tipo.']
 };
 
 function classify(name) {
   const value = String(name || '').toLocaleLowerCase('es-CO');
-  if (value.includes('iphone')) return 'Electrónica';
+  if (value.includes('iphone')) return 'Telefonía';
   if (/(spirulina|vinagre|omega|collagen|fish oil|vitamina|hierro|acidez|zinc|biotina|d3|magnesio|centrum)/.test(value)) return 'Vitaminas y suplementos';
   if (/(lip gloss|gloss|bálsamo labial|labial|kiko)/.test(value)) return 'Maquillaje y belleza';
   if (value.includes('jabón íntimo')) return 'Cuidado íntimo';
@@ -42,6 +42,19 @@ function brandFromLegacyCategory(categoryName) {
   return brands[categoryName] || '';
 }
 
+function brandFromProductName(name) {
+  const value = String(name || '').toLocaleLowerCase('es-CO');
+  if (value.includes('cer 100')) return 'Elizavecca';
+  if (value.includes('tree hut')) return 'Tree Hut';
+  if (value.includes('aceite corporal truly')) return 'Truly';
+  if (value.includes('the ordinary')) return 'The Ordinary';
+  if (value.includes('centrum')) return 'Centrum';
+  if (value.includes('snte')) return 'SNTE';
+  if (value.includes('vagiisl')) return 'Vagiisl';
+  if (value.includes('stop chafe')) return 'Stop Chafe';
+  return '';
+}
+
 const client = await pool.connect();
 try {
   await client.query('BEGIN');
@@ -56,7 +69,7 @@ try {
   const products = await client.query('SELECT p.id,p.name,p.brand,p.category_id AS "categoryId" FROM products p WHERE p.store_id = $1 FOR UPDATE', [storeId]);
   const targetIds = new Map(Object.entries(targetCategories).map(([id, [name]]) => [name, id]));
   for (const product of products.rows) {
-    const brand = String(product.brand || '').trim() || brandFromLegacyCategory(byId.get(product.categoryId)?.name);
+    const brand = String(product.brand || '').trim() || brandFromLegacyCategory(byId.get(product.categoryId)?.name) || brandFromProductName(product.name);
     const categoryName = classify(product.name);
     const categoryId = targetIds.get(categoryName);
     if (!categoryId) throw new Error(`Clasificación sin categoría para: ${product.name}`);
