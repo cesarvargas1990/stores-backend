@@ -21,6 +21,7 @@ export function seed() {
       { id: hogar, name: 'Hogar', description: 'Soluciones prácticas', imageUrl: image('category-hogar.webp'), active: true, sortOrder: 4, createdAt, updatedAt: createdAt },
       { id: viaje, name: 'Viaje', description: 'Accesorios para moverte', imageUrl: '', active: true, sortOrder: 5, createdAt, updatedAt: createdAt }
     ].map((category) => ({ ...category, storeId })),
+    brands: [],
     products: [
       ['Audífonos inalámbricos Pro', tech, 189900, '🎧'], ['Tenis urbanos', moda, 249900, '👟'], ['Termo térmico premium', hogar, 119900, '🥤'], ['Parlante portátil Bluetooth', tech, 169900, '🔊'], ['Set de cuidado personal', belleza, 139900, '✨'], ['Accesorio organizador de viaje', viaje, 89900, '🧳'], ['Lámpara LED para escritorio', hogar, 129900, '💡'], ['Gadget inteligente para casa', tech, 219900, '🏠']
     ].map(([name, categoryId, price, fallback], index) => ({ id: id(), storeId, name, description: '', categoryId, price, previousPrice: null, imageUrl: '', gallery: [], active: true, available: true, featured: index < 4, badge: '', sku: '', stock: null, fallback, sortOrder: index + 1, createdAt, updatedAt: createdAt })),

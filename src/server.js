@@ -43,12 +43,22 @@ function generatedDetails(product, category) { const categoryName = category?.na
 function brandForProduct(product, categories) { const category = categories.find(item => item.id === product.categoryId); return String(product.brand || BRAND_ALIASES[category?.name] || (BRAND_CATEGORY_NAMES.has(category?.name) ? category.name : '')).trim(); }
 function brandOptions(products, categories) { return [...new Set(products.map(product => brandForProduct(product, categories)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es')); }
 function detailsForProduct(product, categories) { return { ...product, brand: brandForProduct(product, categories), detailsHtml: String(product.detailsHtml || '').trim() || generatedDetails(product, categories.find(category => category.id === product.categoryId)) }; }
-function publicCatalog(store) { const categories = db.data.categories.filter(item => item.storeId === store.id && item.active).sort((a,b) => a.sortOrder-b.sortOrder); const products = db.data.products.filter(item => item.storeId === store.id && item.active && item.available).sort((a,b) => a.sortOrder-b.sortOrder).map(product => detailsForProduct(product, categories)); return { store: publicStore(store), settings: settingsWithDefaults(store), categories, products, featuredProducts: products.filter(product => product.featured) }; }
+function publicCatalog(store) { const categories = db.data.categories.filter(item => item.storeId === store.id && item.active).sort((a,b) => a.sortOrder-b.sortOrder); const brands = (db.data.brands || []).filter(item => item.storeId === store.id && item.active).sort((a,b) => a.sortOrder-b.sortOrder || a.name.localeCompare(b.name, 'es')); const products = db.data.products.filter(item => item.storeId === store.id && item.active && item.available).sort((a,b) => a.sortOrder-b.sortOrder).map(product => detailsForProduct(product, categories)); return { store: publicStore(store), settings: settingsWithDefaults(store), categories, brands, products, featuredProducts: products.filter(product => product.featured) }; }
 function validateRecord(collectionName, input) {
   if (collectionName === 'categories' && !cleanText(input.name, 120)) throw new Error('El nombre de la categoría es obligatorio.');
+  if (collectionName === 'brands' && !cleanText(input.name, 120)) throw new Error('El nombre de la marca es obligatorio.');
   if (collectionName === 'products' && (!cleanText(input.name, 160) || !input.categoryId || Number(input.price) < 0)) throw new Error('Producto inválido: nombre, categoría y precio son obligatorios.');
   if (collectionName === 'products' && input.previousPrice !== '' && input.previousPrice != null && Number(input.previousPrice) <= Number(input.price)) throw new Error('El precio anterior debe ser mayor que el precio actual.');
   if (collectionName === 'settings' && input.whatsappNumber && !/^\d{8,15}$/.test(String(input.whatsappNumber).replace(/\D/g, ''))) throw new Error('El número de WhatsApp debe contener solo dígitos.');
+}
+function normalizeBrandInput(input, current = {}) {
+  return {
+    name: cleanText(input.name ?? current.name, 120),
+    description: cleanText(input.description ?? current.description, 240),
+    imageUrl: input.imageUrl === undefined ? (current.imageUrl || '') : cleanUrl(input.imageUrl),
+    active: input.active === undefined ? (current.active ?? true) : input.active === true,
+    sortOrder: Number.isFinite(Number(input.sortOrder ?? current.sortOrder)) ? Number(input.sortOrder ?? current.sortOrder) : 0,
+  };
 }
 function sessionCookie(token) { const secure = process.env.COOKIE_SECURE === 'true'; return `stores_session=${token}; HttpOnly; SameSite=${secure ? 'None' : 'Lax'}; Path=/; Max-Age=28800${secure ? '; Secure' : ''}`; }
 function nav(active) {
@@ -357,19 +367,19 @@ async function handleApi(req, res, pathname) {
   if (storeId && !canAccess(user, storeId)) return send(res, 403, { error: 'No tienes permiso para esta tienda.' });
   try {
     if (req.method === 'GET' && parts[2] === 'stores') return send(res, 200, { stores: db.data.stores.filter(s => user.role === 'master' || user.storeIds.includes(s.id)).map(s => ({ ...s, apiKey: user.role === 'master' ? s.apiKey : undefined })) });
-    if (req.method === 'GET' && ['categories','products','settings'].includes(parts[2])) {
+    if (req.method === 'GET' && ['brands','categories','products','settings'].includes(parts[2])) {
       const collection = parts[2] === 'settings' ? db.data.settings : db.data[parts[2]];
       return send(res, 200, parts[2] === 'settings' ? [settingsWithDefaults(findStore(storeId), collection.find(item => item.storeId === storeId))] : parts[2] === 'products' ? collection.filter(item => item.storeId === storeId).map(item => detailsForProduct(item, db.data.categories)) : collection.filter(item => item.storeId === storeId));
     }
     const collectionName = parts[2]; const collection = collectionName === 'settings' ? db.data.settings : db.data[collectionName];
-    if (!collection || (collectionName !== 'stores' && !['categories','products','settings'].includes(collectionName))) return send(res, 404, { error: 'Recurso no encontrado.' });
+    if (!collection || (collectionName !== 'stores' && !['brands','categories','products','settings'].includes(collectionName))) return send(res, 404, { error: 'Recurso no encontrado.' });
     if (req.method === 'POST') {
       if (collectionName === 'stores' && user.role !== 'master') return send(res, 403, { error: 'Solo el usuario master puede crear tiendas.' });
-      const input = await body(req); validateRecord(collectionName, input); if (collectionName === 'settings' && user.role !== 'master') { const current = collection.find(item => item.storeId === storeId) || {}; if (('logoUrl' in input && input.logoUrl !== current.logoUrl) || ('heroImageUrl' in input && input.heroImageUrl !== current.heroImageUrl) || ('heroMobileImageUrl' in input && input.heroMobileImageUrl !== current.heroMobileImageUrl)) return send(res, 403, { error: 'Solo el usuario master puede cambiar el logo y las imágenes del hero.' }); } const created = collectionName === 'stores' ? { ...input, id: id(), slug: cleanText(input.slug || input.name, 80).toLowerCase().replace(/[^a-z0-9]+/g, '-'), apiKey: crypto.randomBytes(32).toString('hex'), active: true, createdAt: now(), updatedAt: now() } : { ...input, id: id(), storeId, createdAt: now(), updatedAt: now() }; if (collectionName === 'settings') { const existing = collection.findIndex(x => x.storeId === storeId); if (existing >= 0) collection[existing] = { ...collection[existing], ...input, updatedAt: now() }; else collection.push(created); }
+      const input = await body(req); if (collectionName === 'brands') Object.assign(input, normalizeBrandInput(input)); validateRecord(collectionName, input); if (collectionName === 'brands' && collection.some(item => item.storeId === storeId && item.name.toLocaleLowerCase('es') === cleanText(input.name, 120).toLocaleLowerCase('es'))) return send(res, 409, { error: 'Ya existe una marca con ese nombre.' }); if (collectionName === 'settings' && user.role !== 'master') { const current = collection.find(item => item.storeId === storeId) || {}; if (('logoUrl' in input && input.logoUrl !== current.logoUrl) || ('heroImageUrl' in input && input.heroImageUrl !== current.heroImageUrl) || ('heroMobileImageUrl' in input && input.heroMobileImageUrl !== current.heroMobileImageUrl)) return send(res, 403, { error: 'Solo el usuario master puede cambiar el logo y las imágenes del hero.' }); } const created = collectionName === 'stores' ? { ...input, id: id(), slug: cleanText(input.slug || input.name, 80).toLowerCase().replace(/[^a-z0-9]+/g, '-'), apiKey: crypto.randomBytes(32).toString('hex'), active: true, createdAt: now(), updatedAt: now() } : { ...input, id: id(), storeId, createdAt: now(), updatedAt: now() }; if (collectionName === 'settings') { const existing = collection.findIndex(x => x.storeId === storeId); if (existing >= 0) collection[existing] = { ...collection[existing], ...input, updatedAt: now() }; else collection.push(created); }
       else collection.push(created); await db.save(); return send(res, 201, collectionName === 'settings' ? settingsWithDefaults(findStore(storeId), collection.find(x => x.storeId === storeId)) : collectionName === 'products' ? detailsForProduct(created, db.data.categories) : created);
     }
     const itemId = parts[3]; const index = collection.findIndex(item => item.id === itemId && item.storeId === storeId); if (index < 0) return send(res, 404, { error: 'Registro no encontrado.' });
-    if (req.method === 'PATCH') { const input = await body(req); validateRecord(collectionName, { ...collection[index], ...input }); collection[index] = { ...collection[index], ...input, id: itemId, storeId, updatedAt: now() }; await db.save(); return send(res, 200, collectionName === 'products' ? detailsForProduct(collection[index], db.data.categories) : collection[index]); }
+    if (req.method === 'PATCH') { const input = await body(req); if (collectionName === 'brands') Object.assign(input, normalizeBrandInput(input, collection[index])); validateRecord(collectionName, { ...collection[index], ...input }); if (collectionName === 'brands' && collection.some(item => item.storeId === storeId && item.id !== itemId && item.name.toLocaleLowerCase('es') === cleanText(input.name ?? collection[index].name, 120).toLocaleLowerCase('es'))) return send(res, 409, { error: 'Ya existe una marca con ese nombre.' }); const previousName = collectionName === 'brands' ? collection[index].name : ''; collection[index] = { ...collection[index], ...input, id: itemId, storeId, updatedAt: now() }; if (collectionName === 'brands' && input.name && previousName !== collection[index].name) for (const product of db.data.products) if (product.storeId === storeId && brandForProduct(product, db.data.categories) === previousName) { product.brand = collection[index].name; product.updatedAt = now(); } await db.save(); return send(res, 200, collectionName === 'products' ? detailsForProduct(collection[index], db.data.categories) : collection[index]); }
     if (req.method === 'DELETE') { collection[index] = { ...collection[index], active: false, updatedAt: now() }; await db.save(); return send(res, 200, collection[index]); }
   } catch (error) { return send(res, 400, { error: error.message }); }
 }
@@ -448,4 +458,20 @@ const server = http.createServer(async (req, res) => {
 
 await fs.mkdir(uploadDir, { recursive: true });
 await db.init(seed);
+if (db instanceof JsonStore) {
+  const hadBrands = Array.isArray(db.data.brands);
+  db.data.brands ||= [];
+  let brandsChanged = !hadBrands;
+  const knownBrands = new Set(db.data.brands.map(brand => `${brand.storeId}:${brand.name.toLocaleLowerCase('es')}`));
+  let nextSortOrder = db.data.brands.reduce((max, brand) => Math.max(max, Number(brand.sortOrder) || 0), 0);
+  for (const product of db.data.products) {
+    const name = brandForProduct(product, db.data.categories);
+    const key = `${product.storeId}:${name.toLocaleLowerCase('es')}`;
+    if (!name || knownBrands.has(key)) continue;
+    db.data.brands.push({ id: id(), storeId: product.storeId, name, description: '', imageUrl: '', active: true, sortOrder: ++nextSortOrder, createdAt: now(), updatedAt: now() });
+    knownBrands.add(key);
+    brandsChanged = true;
+  }
+  if (brandsChanged) await db.save();
+}
 server.listen(port, () => console.log(`Stores Admin escuchando en http://localhost:${port}/storeadmin/`));
